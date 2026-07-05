@@ -100,8 +100,10 @@ def test_mongo_repository_raises_clear_errors_when_missing() -> None:
 
 def test_in_memory_publisher_keeps_event_order() -> None:
     publisher = InMemoryEventPublisher()
-    first = DomainEvent(event_type="FIRST", correlation_id="os-1", payload={})
-    second = DomainEvent(event_type="SECOND", correlation_id="os-1", payload={})
+    first = DomainEvent(event_type="EXECUTION_QUEUED", correlation_id="os-1", payload={})
+    second = DomainEvent(
+        event_type="EXECUTION_STARTED", correlation_id="os-1", payload={}
+    )
 
     publisher.publish(first)
     publisher.publish(second)
