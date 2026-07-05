@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
@@ -8,11 +9,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .infrastructure.config.settings import Settings, get_settings
 from .infrastructure.logging import configure_logging
-from .infrastructure.messaging.in_memory_event_publisher import InMemoryEventPublisher
 from .infrastructure.observability.metrics import REQUEST_COUNTER, REQUEST_DURATION
-from .infrastructure.repositories.in_memory_execution_repository import (
-    InMemoryExecutionJobRepository,
-)
+from .infrastructure.runtime import build_event_publisher, build_execution_repository
 from .presentation.api.routes import (
     event_router,
     execution_router,
@@ -27,17 +25,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        close = getattr(app.state.event_publisher, "close", None)
+        if close is not None:
+            close()
+
     app = FastAPI(
         title="Service Order Execution Service",
-        description=(
-            "Execution service skeleton for FIAP Phase 4. Endpoints will be added "
-            "in later slices."
-        ),
+        description="Execution service for queue, repair progress, and completion.",
         version=settings.APP_VERSION,
+        lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.execution_repository = InMemoryExecutionJobRepository()
-    app.state.event_publisher = InMemoryEventPublisher()
+    app.state.execution_repository = build_execution_repository(settings)
+    app.state.event_publisher = build_event_publisher(settings)
 
     if settings.TRUSTED_HOSTS and settings.TRUSTED_HOSTS != ["*"]:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
