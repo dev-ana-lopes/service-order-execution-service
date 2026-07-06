@@ -5,11 +5,18 @@ from src.infrastructure.messaging.in_memory_event_publisher import InMemoryEvent
 from src.infrastructure.messaging.rabbitmq_blocking_publisher import (
     RabbitMqBlockingEventPublisher,
 )
+from src.infrastructure.messaging.rabbitmq_blocking_worker import (
+    RabbitMqBlockingEventWorker,
+)
 from src.infrastructure.repositories.in_memory_execution_repository import (
     InMemoryExecutionJobRepository,
 )
 from src.infrastructure.repositories.mongo_execution_repository import (
     MongoExecutionJobRepository,
+)
+from src.infrastructure.repositories.processed_event_repositories import (
+    InMemoryProcessedEventRepository,
+    MongoProcessedEventRepository,
 )
 
 
@@ -32,3 +39,23 @@ def build_event_publisher(settings: Settings):
             settings.RABBITMQ_QUEUE,
         )
     return InMemoryEventPublisher()
+
+
+def build_processed_event_repository(settings: Settings):
+    if settings.APP_RUNTIME_MODE == "real":
+        from pymongo import MongoClient
+
+        client = MongoClient(settings.MONGODB_URL)
+        database = client.get_default_database()
+        return MongoProcessedEventRepository(database["processed_events"])
+    return InMemoryProcessedEventRepository()
+
+
+def build_event_worker(settings: Settings, handler):
+    return RabbitMqBlockingEventWorker(
+        settings.RABBITMQ_URL,
+        settings.RABBITMQ_EXCHANGE,
+        settings.RABBITMQ_QUEUE,
+        settings.RABBITMQ_CONSUME_ROUTING_KEYS,
+        handler,
+    )

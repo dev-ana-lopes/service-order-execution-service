@@ -5,6 +5,7 @@ from typing import Any
 from src.domain.events import DomainEvent
 
 INTEGRATION_EVENT_TYPES = {
+    "EXECUTION_REQUESTED",
     "EXECUTION_QUEUED",
     "EXECUTION_STARTED",
     "EXECUTION_COMPLETED",

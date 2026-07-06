@@ -66,8 +66,17 @@ RabbitMQ integration is represented by thin infrastructure adapters:
 
 - `RabbitMqEventPublisher`
 - `RabbitMqEventConsumer`
+- `RabbitMqBlockingEventWorker`
 
 Automated tests use fake channels only. They do not connect to production queues. In `real` runtime mode, the app publishes events to RabbitMQ through `RabbitMqBlockingEventPublisher`.
+
+The worker process runs with:
+
+```bash
+python -m src.worker
+```
+
+It consumes `EXECUTION_REQUESTED`, enqueues execution, publishes `EXECUTION_QUEUED`, and stores processed `event_id` values before acknowledging messages.
 
 Environment variables:
 
@@ -75,6 +84,9 @@ Environment variables:
 - `RABBITMQ_EXCHANGE`
 - `RABBITMQ_ROUTING_KEY`
 - `RABBITMQ_QUEUE`
+- `RABBITMQ_CONSUME_ROUTING_KEYS`
+
+Processed integration events are stored in MongoDB in the `processed_events` collection for idempotent worker consumption.
 
 ## Local Development
 
@@ -104,6 +116,8 @@ Result: `27 passed`, `90%` coverage.
 The GitHub Actions workflow validates lint, tests, coverage, SonarCloud, image build/push to GHCR, manifest rendering, and k3s deployment.
 
 Kubernetes manifests are under `k8s/`. Manifests must be rendered with an explicit GHCR image before applying to the cluster.
+
+The API deployment is `k8s/deployment.yaml`; the RabbitMQ worker deployment is `k8s/deployment-worker.yaml`.
 
 ## Cost Notes
 
