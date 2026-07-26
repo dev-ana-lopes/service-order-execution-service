@@ -51,6 +51,8 @@ The event envelope is JSON with `event_id`, `event_type`, `correlation_id`, `occ
 - `memory`: uses in-memory repository and publisher for local tests and fast demos.
 - `real`: uses MongoDB repository and RabbitMQ publisher.
 
+`DATABASE_URL` is tolerated only for backward compatibility with shared environments. This service no longer uses or requires it.
+
 ## NoSQL Ownership
 
 Execution uses a MongoDB repository boundary for execution documents:
@@ -88,6 +90,12 @@ Environment variables:
 
 Processed integration events are stored in MongoDB in the `processed_events` collection for idempotent worker consumption.
 
+## Health and Readiness
+
+- `/health` and `/health/live` are shallow process checks.
+- `/health/ready` validates only `application` in `memory` mode.
+- `/health/ready` validates `application`, `mongo`, and `rabbitmq` in `real` mode and returns HTTP `503` if a required dependency is unavailable.
+
 ## Local Development
 
 ```bash
@@ -97,6 +105,10 @@ make test
 make test-cov
 make run-dev
 ```
+
+The local API defaults to `http://localhost:8003` and Swagger to `http://localhost:8003/docs`.
+
+`make compose-up` starts MongoDB and RabbitMQ alongside the API and worker, and defaults the Docker stack to `APP_RUNTIME_MODE=real` so execution jobs persist in MongoDB locally. Plain `make run-dev` still uses the `.env` value, which is `memory` by default.
 
 ## Validation Evidence
 

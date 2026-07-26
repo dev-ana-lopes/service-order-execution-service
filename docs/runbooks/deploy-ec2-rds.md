@@ -1,21 +1,21 @@
-﻿# Runbook de Deploy em EC2 + RDS
+# Runbook de Deploy em EC2 + k3s
 
 ## Objetivo
 
-Executar deploy de produção da API com Kubernetes (`k3s`) na EC2 e PostgreSQL no RDS.
+Executar deploy de produção da API com Kubernetes (`k3s`) na EC2, com MongoDB e RabbitMQ como dependências externas.
 
 ## Fluxo oficial (primário)
 
 - Build e push da imagem no GHCR via GitHub Actions
 - Conexão SSH do runner na EC2
-- Execução de `prepare_env.py`, render de manifests e `kubectl apply/wait/rollout` dentro da EC2
+- Execução de `prepare_env.py`, render de manifests e `kubectl apply/rollout` dentro da EC2
 
 ## Pré-requisitos
 
 - Infra criada pelo Terraform em `infra/`
-- EC2 com `k3s`, `kubectl`, `docker` e acesso ao RDS
+- EC2 com `k3s`, `kubectl`, `docker` e acesso ao MongoDB/RabbitMQ
 - Acesso SSH da pipeline para a EC2
-- Repositório disponível em `/opt/service-order-execution-service` na EC2 (sincronizado no workflow)
+- Repositório disponível em `/opt/service-order-execution-service` na EC2
 
 ## Configuração do GitHub (produção)
 
@@ -32,13 +32,11 @@ Executar deploy de produção da API com Kubernetes (`k3s`) na EC2 e PostgreSQL 
 
 ## Pipeline de deploy Kubernetes (CI/CD)
 
-1. `validate` (PR/push): lint, testes, validação de render de manifests
+1. `validate` (PR/push): lint, testes e validação de render de manifests
 2. `build-publish` (push/main): build + push para `ghcr.io/<owner>/service-order-execution-service:sha-<commit_sha>`
 3. `deploy-k8s-ec2` (push/main): SSH na EC2 e execução do deploy no cluster local `k3s`
 
 ## Passo a passo manual (contingência)
-
-Use este fluxo somente para operação assistida ou troubleshooting.
 
 ### 1. Conectar na EC2
 
@@ -76,11 +74,6 @@ python3 scripts/deploy/render_k8s_manifests.py \
 ```bash
 kubectl apply -f .rendered-k8s/namespace.yaml
 kubectl apply -f .rendered-k8s/configmap.rendered.yaml -f .rendered-k8s/secret.rendered.yaml
-
-kubectl delete job -n service-order service-order-execution-service-migrate --ignore-not-found
-kubectl apply -f .rendered-k8s/job-migrate.yaml
-kubectl wait --for=condition=complete job/service-order-execution-service-migrate -n service-order --timeout=300s
-
 kubectl apply -f .rendered-k8s/deployment.yaml -f .rendered-k8s/service.yaml -f .rendered-k8s/hpa.yaml
 kubectl rollout status deployment/service-order-execution-service -n service-order --timeout=300s
 ```
@@ -97,4 +90,3 @@ curl http://<ec2-public-ip>/health/ready
 ## Fallback legado (Docker Compose)
 
 O fluxo Compose permanece apenas para contingência operacional. Para esse procedimento, consulte `README.deploy.md`.
-

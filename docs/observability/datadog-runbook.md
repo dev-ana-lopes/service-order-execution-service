@@ -56,7 +56,7 @@ GET https://oubv5hamu5.execute-api.us-east-1.amazonaws.com/health/ready
 ```
 
 Expected result: HTTP `200` for both endpoints. `/health/ready` also validates
-database readiness through the API.
+MongoDB and RabbitMQ readiness through the API in `real` mode.
 
 ## HPA Evidence
 

@@ -1,23 +1,25 @@
-﻿services:
+services:
   api:
     image: service-order-execution-service:dev
     build: .
     container_name: service-order-execution-service
     command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
-      - "8000:8000"
+      - "8003:8000"
     env_file:
       - ${APP_ENV_FILE:-.env}
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://service_order_user:service_order_password@postgres:5432/service_order_db}
+    environment: &app_environment
+      APP_RUNTIME_MODE: ${DOCKER_APP_RUNTIME_MODE:-real}
+      MONGODB_URL: ${DOCKER_MONGODB_URL:-mongodb://mongo:27017/service_order}
+      RABBITMQ_URL: ${DOCKER_RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2F}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       APP_NAME: ${APP_NAME:-service-order-execution-service}
       APP_VERSION: ${APP_VERSION:-2.1.0}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8003}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_JSON: ${LOG_JSON:-false}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-SMTP}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:8000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:8003}
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-*}
       SMTP_HOST: ${SMTP_HOST:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -36,11 +38,14 @@
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
       HEALTHCHECK_TIMEOUT_SECONDS: ${HEALTHCHECK_TIMEOUT_SECONDS:-5}
-      MIGRATE_ON_STARTUP: ${MIGRATE_ON_STARTUP:-true}
-      MIGRATE_MAX_ATTEMPTS: ${MIGRATE_MAX_ATTEMPTS:-30}
-      MIGRATE_RETRY_SLEEP_SECONDS: ${MIGRATE_RETRY_SLEEP_SECONDS:-2}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-service-order.events}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-service-order.execution}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-service-order.execution.events}
+      RABBITMQ_CONSUME_ROUTING_KEYS: ${RABBITMQ_CONSUME_ROUTING_KEYS:-service-order.os}
     depends_on:
-      postgres:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       mailhog:
         condition: service_healthy
@@ -49,37 +54,78 @@
     volumes:
       - .:/app
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: service-order-postgres
+  worker:
+    image: service-order-execution-service:dev
+    build: .
+    container_name: service-order-execution-worker
+    command: ["python", "-m", "src.worker"]
+    env_file:
+      - ${APP_ENV_FILE:-.env}
     environment:
-      POSTGRES_DB: service_order_db
-      POSTGRES_USER: service_order_user
-      POSTGRES_PASSWORD: service_order_password
-    ports:
-      - "5432:5432"
+      <<: *app_environment
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_healthy
     networks:
       - service-order-network
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - .:/app
+
+  mongo:
+    image: mongo:7
+    container_name: service-order-execution-mongo
+    ports:
+      - "27018:27017"
+    networks:
+      - service-order-network
+    volumes:
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U service_order_user -d service_order_db"]
+      test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/service_order", "--eval", "db.runCommand({ ping: 1 })"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: service-order-execution-rabbitmq
+    ports:
+      - "${RABBITMQ_HOST_PORT:-5674}:5672"
+      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-15674}:15672"
+    networks:
+      - service-order-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: service-order-mailhog
+    container_name: service-order-execution-mailhog
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "1027:1025"
+      - "8027:8025"
     networks:
       - service-order-network
     healthcheck:
@@ -90,9 +136,9 @@
       start_period: 10s
 
 volumes:
-  postgres_data:
+  mongo_data:
+  rabbitmq_data:
 
 networks:
   service-order-network:
     driver: bridge
-

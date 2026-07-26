@@ -1,5 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from jose import jwt
 
 from src.infrastructure.config.settings import Settings
 from src.main import create_app
@@ -14,20 +15,31 @@ def test_app_has_execution_dependencies():
 
 @pytest.mark.asyncio
 async def test_execution_api_happy_path():
-    app = create_app(_settings())
+    settings = _settings()
+    app = create_app(settings)
     transport = ASGITransport(app=app)
+    headers = {"Authorization": f"Bearer {_admin_token(settings)}"}
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         enqueue_response = await client.post(
-            "/executions", json={"service_order_id": "os-1"}
+            "/executions",
+            json={"service_order_id": "os-1"},
+            headers=headers,
         )
         execution_id = enqueue_response.json()["execution_id"]
-        start_response = await client.post(f"/executions/{execution_id}/start")
+        start_response = await client.post(
+            f"/executions/{execution_id}/start",
+            headers=headers,
+        )
         complete_response = await client.post(
             f"/executions/{execution_id}/complete",
             json={"steps": ["Diagnose brake noise", "Replace brake pads"]},
+            headers=headers,
         )
-        get_response = await client.get(f"/executions/{execution_id}")
+        get_response = await client.get(
+            f"/executions/{execution_id}",
+            headers=headers,
+        )
 
     assert enqueue_response.status_code == 201
     assert enqueue_response.json()["status"] == "QUEUED"
@@ -41,13 +53,39 @@ async def test_execution_api_happy_path():
 
 @pytest.mark.asyncio
 async def test_execution_api_returns_not_found():
-    app = create_app(_settings())
+    settings = _settings()
+    app = create_app(settings)
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/executions/missing")
+        response = await client.get(
+            "/executions/missing",
+            headers={"Authorization": f"Bearer {_admin_token(settings)}"},
+        )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_execution_api_requires_valid_token():
+    settings = _settings()
+    app = create_app(settings)
+    transport = ASGITransport(app=app)
+    invalid_token = jwt.encode(
+        {"role": "admin", "user_id": "admin-1"},
+        "wrong-secret",
+        algorithm="HS256",
+    )
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        unauthorized = await client.get("/executions/missing")
+        forbidden = await client.get(
+            "/executions/missing",
+            headers={"Authorization": f"Bearer {invalid_token}"},
+        )
+
+    assert unauthorized.status_code == 401
+    assert forbidden.status_code == 403
 
 
 def _settings() -> Settings:
@@ -57,5 +95,14 @@ def _settings() -> Settings:
         ENVIRONMENT="test",
         DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/db",
         JWT_SECRET="test-secret-value-with-32-characters",
-        APPROVAL_TOKEN_SECRET="approval-secret-value-with-32-chars",
+        CUSTOMER_JWT_SECRET="customer-secret-value-with-32-characters",
+        CUSTOMER_JWT_ISSUER="service-order-auth-lambda/test",
+    )
+
+
+def _admin_token(settings: Settings) -> str:
+    return jwt.encode(
+        {"role": "admin", "user_id": "admin-1", "iss": settings.JWT_ISSUER},
+        settings.JWT_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
     )

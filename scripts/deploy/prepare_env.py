@@ -27,11 +27,12 @@ REQUIRED_TEXT_FIELDS = (
     "ENVIRONMENT",
     "LOG_LEVEL",
     "LOG_JSON",
-    "DATABASE_URL",
     "APP_BASE_URL",
     "CORS_ALLOWED_ORIGINS",
     "TRUSTED_HOSTS",
     "JWT_ALGORITHM",
+    "MONGODB_URL",
+    "RABBITMQ_URL",
 )
 VALID_ENVIRONMENTS = {"development", "test", "staging", "production"}
 VALID_EMAIL_PROVIDERS = {"SMTP", "NOOP"}
@@ -122,14 +123,6 @@ def normalize_optional_positive_integer(
         return
 
     normalize_positive_integer(values, key)
-
-
-def validate_database_url(values: dict[str, str]) -> None:
-    database_url = require_non_empty(values, "DATABASE_URL")
-    if not database_url.startswith(("postgresql://", "postgresql+asyncpg://")):
-        raise EnvValidationError(
-            "DATABASE_URL must start with postgresql:// or postgresql+asyncpg://."
-        )
 
 
 def validate_app_base_url(values: dict[str, str]) -> None:
@@ -228,7 +221,6 @@ def prepare_env(env_path: Path) -> None:
     for key, default in OPTIONAL_POSITIVE_INTEGER_DEFAULTS.items():
         normalize_optional_positive_integer(values, key, default)
 
-    validate_database_url(values)
     validate_app_base_url(values)
     normalize_list_field(values, "CORS_ALLOWED_ORIGINS")
     normalize_list_field(values, "TRUSTED_HOSTS")

@@ -10,8 +10,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .infrastructure.config.settings import Settings, get_settings
 from .infrastructure.logging import configure_logging
 from .infrastructure.observability.metrics import REQUEST_COUNTER, REQUEST_DURATION
+from .infrastructure.readiness import build_readiness_checker
 from .infrastructure.runtime import build_event_publisher, build_execution_repository
 from .presentation.api.routes import (
+    auth_router,
     event_router,
     execution_router,
     health_router,
@@ -41,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.execution_repository = build_execution_repository(settings)
     app.state.event_publisher = build_event_publisher(settings)
+    app.state.readiness_checker = build_readiness_checker(settings)
 
     if settings.TRUSTED_HOSTS and settings.TRUSTED_HOSTS != ["*"]:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
@@ -89,6 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(metrics_router)
+    app.include_router(auth_router)
     app.include_router(execution_router)
     app.include_router(event_router)
     return app

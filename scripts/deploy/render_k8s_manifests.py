@@ -9,7 +9,6 @@ import re
 SENSITIVE_KEYS = {
     "APPROVAL_TOKEN_SECRET",
     "APPROVAL_TOKEN_SECRET_FILE",
-    "DATABASE_URL",
     "JWT_SECRET",
     "JWT_SECRET_FILE",
     "SMTP_PASSWORD",
@@ -24,20 +23,20 @@ SENSITIVE_KEYS = {
 }
 REQUIRED_SECRET_KEYS = {
     "APPROVAL_TOKEN_SECRET",
-    "DATABASE_URL",
+    "MONGODB_URL",
+    "RABBITMQ_URL",
     "JWT_SECRET",
     "CUSTOMER_JWT_SECRET",
 }
 STATIC_MANIFESTS = (
     "namespace.yaml",
-    "job-migrate.yaml",
     "deployment.yaml",
     "deployment-worker.yaml",
     "service.yaml",
     "hpa.yaml",
     "ingress.yaml",
 )
-IMAGE_MANIFESTS = ("job-migrate.yaml", "deployment.yaml", "deployment-worker.yaml")
+IMAGE_MANIFESTS = ("deployment.yaml", "deployment-worker.yaml")
 IMAGE_PLACEHOLDER = "__API_IMAGE__"
 LEGACY_IMAGE_PLACEHOLDER = "${API_IMAGE}"
 IMAGE_PLACEHOLDER_PATTERNS = (
@@ -187,8 +186,6 @@ def main() -> int:
 
     values = parse_env_file(env_path)
     values.setdefault("EMAIL_PROVIDER", "NOOP")
-    values["MIGRATE_ON_STARTUP"] = "false"
-
     secret_values = {
         key: value
         for key, value in values.items()

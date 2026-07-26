@@ -15,7 +15,8 @@ def write_k8s_env(env_file: Path) -> None:
         "\n".join(
             [
                 "APP_NAME=service-order-execution-service",
-                "DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/db",
+                "MONGODB_URL=mongodb://mongo:27017/service_order",
+                "RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/%2F",
                 "JWT_SECRET=jwt-secret-for-tests",
                 "CUSTOMER_JWT_SECRET=customer-jwt-secret-for-tests",
                 "APPROVAL_TOKEN_SECRET=approval-secret-for-tests",
@@ -47,17 +48,20 @@ def run_render(tmp_path: Path, *, image: str) -> subprocess.CompletedProcess[str
     )
 
 
-def test_render_k8s_manifests_injects_image_into_job_and_deployment(tmp_path: Path):
+def test_render_k8s_manifests_injects_image_into_deployments(tmp_path: Path):
     image = "ghcr.io/example/-test"
     result = run_render(tmp_path, image=image)
     assert result.returncode == 0, result.stderr
     output_dir = tmp_path / "rendered-k8s"
     deployment = (output_dir / "deployment.yaml").read_text(encoding="utf-8")
-    job = (output_dir / "job-migrate.yaml").read_text(encoding="utf-8")
+    worker = (output_dir / "deployment-worker.yaml").read_text(encoding="utf-8")
+    secret = (output_dir / "secret.rendered.yaml").read_text(encoding="utf-8")
     assert image in deployment
-    assert image in job
+    assert image in worker
     assert "__API_IMAGE__" not in deployment
-    assert "__API_IMAGE__" not in job
+    assert "__API_IMAGE__" not in worker
+    assert "DATABASE_URL" not in secret
+    assert not (output_dir / "job-migrate.yaml").exists()
 
 
 def test_render_k8s_manifests_rejects_empty_image(tmp_path: Path):

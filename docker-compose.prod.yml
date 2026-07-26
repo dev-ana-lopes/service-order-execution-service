@@ -1,12 +1,13 @@
-﻿services:
-  migrate:
-    image: ${API_IMAGE:-service-order-execution-service:local}
-    container_name: service-order-migrate-prod
-    restart: "no"
-    env_file:
-      - ${APP_ENV_FILE:-.env.prod}
-    environment: &api_environment
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+services:
+  api:
+    image: ${API_IMAGE}
+    container_name: service-order-execution-service-prod
+    init: true
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_RUNTIME_MODE: ${APP_RUNTIME_MODE:-real}
       APP_NAME: ${APP_NAME:-service-order-execution-service}
       APP_VERSION: ${APP_VERSION:-2.1.0}
       ENVIRONMENT: ${ENVIRONMENT:-production}
@@ -33,23 +34,12 @@
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
       HEALTHCHECK_TIMEOUT_SECONDS: ${HEALTHCHECK_TIMEOUT_SECONDS:-5}
-      MIGRATE_ON_STARTUP: "false"
-    networks:
-      - service-order-network
-    command: ["alembic", "-c", "alembic/alembic.ini", "upgrade", "head"]
-
-  api:
-    image: ${API_IMAGE}
-    container_name: service-order-execution-service-prod
-    init: true
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      <<: *api_environment
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+      MONGODB_URL: ${MONGODB_URL:?MONGODB_URL is required}
+      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL is required}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-service-order.events}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-service-order.execution}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-service-order.execution.events}
+      RABBITMQ_CONSUME_ROUTING_KEYS: ${RABBITMQ_CONSUME_ROUTING_KEYS:-service-order.os}
     networks:
       - service-order-network
     logging:
@@ -67,4 +57,3 @@
 networks:
   service-order-network:
     driver: bridge
-

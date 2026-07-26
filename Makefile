@@ -1,4 +1,4 @@
-﻿.PHONY: help install dev-install lint format test test-cov test-integration migrate migrate-create migrate-down run run-dev compose-up compose-down compose-logs compose-db-shell compose-prod-up compose-prod-down compose-smoke test-mailhog-e2e clean build-docker docker-run check
+.PHONY: help install dev-install lint format test test-cov test-integration run run-dev compose-up compose-down compose-logs compose-mongo-shell compose-prod-up compose-prod-down compose-smoke test-mailhog-e2e clean build-docker docker-run check
 
 help:
 	@echo "Service Order Management API - Make Commands"
@@ -13,15 +13,13 @@ help:
 	@echo "  make lint             Run lint suite"
 	@echo "  make test             Run pytest"
 	@echo "  make test-cov         Run pytest with coverage"
-	@echo "  make test-integration Run integration tests against a real PostgreSQL"
-	@echo ""
-	@echo "Database:"
-	@echo "  make migrate          Apply database migrations"
+	@echo "  make test-integration Run integration tests against real dependencies"
 	@echo ""
 	@echo "Running:"
 	@echo "  make run              Run API server"
 	@echo "  make run-dev          Run API server with reload"
 	@echo "  make compose-up       Start local Docker stack"
+	@echo "  make compose-mongo-shell Open a Mongo shell in the local Docker stack"
 	@echo "  make compose-smoke    Run a quick local smoke test"
 	@echo "  make test-mailhog-e2e Run MailHog-focused integration tests"
 
@@ -49,28 +47,18 @@ test-cov:
 test-integration:
 	INTEGRATION_TESTS_ENABLED=true uv run pytest -q -m integration
 
-migrate:
-	uv run alembic -c alembic/alembic.ini upgrade head
-
-migrate-create:
-	@read -p "Enter migration name: " name; \
-	uv run alembic -c alembic/alembic.ini revision --autogenerate -m "$$name"
-
-migrate-down:
-	uv run alembic -c alembic/alembic.ini downgrade -1
-
 run:
-	uv run uvicorn src.main:app --host 0.0.0.0 --port 8000
+	uv run uvicorn src.main:app --host 0.0.0.0 --port 8003
 
 run-dev:
-	uv run uvicorn src.main:app --reload
+	uv run uvicorn src.main:app --host 0.0.0.0 --port 8003 --reload
 
 compose-up:
 	docker compose --env-file .env up -d --build
 
 compose-smoke:
-	curl -fsS http://localhost:8000/health >/dev/null
-	curl -fsS http://localhost:8000/health/ready >/dev/null
+	curl -fsS http://localhost:8003/health >/dev/null
+	curl -fsS http://localhost:8003/health/ready >/dev/null
 	@echo "Compose smoke test passed"
 
 compose-down:
@@ -79,8 +67,8 @@ compose-down:
 compose-logs:
 	docker compose logs -f api
 
-compose-db-shell:
-	docker compose exec postgres psql -U service_order_user -d service_order_db
+compose-mongo-shell:
+	docker compose exec mongo mongosh mongodb://localhost:27017/service_order
 
 compose-prod-up:
 	docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
@@ -98,10 +86,7 @@ build-docker:
 	docker build -t service-order-execution-service:local .
 
 docker-run:
-	docker run -p 8000:8000 \
-		-e DATABASE_URL="postgresql+asyncpg://user:password@host:5432/service_order_db" \
-		service-order-execution-service:local
+	docker run -p 8003:8000 service-order-execution-service:local
 
 check: lint test
 	@echo "Checks passed."
-

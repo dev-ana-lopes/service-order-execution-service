@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from src.application.use_cases import (
@@ -12,7 +12,9 @@ from src.application.use_cases import (
     FailExecutionUseCase,
     StartExecutionUseCase,
 )
+from src.domain.auth import AuthenticatedPrincipal
 from src.domain.execution import ExecutionJob
+from src.presentation.dependencies.auth import require_admin_principal
 
 router = APIRouter(prefix="/executions", tags=["executions"])
 
@@ -35,8 +37,11 @@ def execution_to_response(execution_job: ExecutionJob) -> dict[str, Any]:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def enqueue_execution(
-    payload: EnqueueExecutionRequest, request: Request
+    payload: EnqueueExecutionRequest,
+    request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
 ) -> dict[str, Any]:
+    del principal
     use_case = EnqueueExecutionUseCase(
         request.app.state.execution_repository,
         request.app.state.event_publisher,
@@ -53,7 +58,12 @@ def enqueue_execution(
 
 
 @router.get("/{execution_id}")
-def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
+def get_execution(
+    execution_id: str,
+    request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
+) -> dict[str, Any]:
+    del principal
     try:
         execution_job = request.app.state.execution_repository.get(execution_id)
     except KeyError as exc:
@@ -64,7 +74,12 @@ def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
 
 
 @router.post("/{execution_id}/start")
-def start_execution(execution_id: str, request: Request) -> dict[str, Any]:
+def start_execution(
+    execution_id: str,
+    request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
+) -> dict[str, Any]:
+    del principal
     try:
         execution_job = StartExecutionUseCase(
             request.app.state.execution_repository,
@@ -86,7 +101,9 @@ def complete_execution(
     execution_id: str,
     payload: CompleteExecutionRequest,
     request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
 ) -> dict[str, Any]:
+    del principal
     try:
         execution_job = CompleteExecutionUseCase(
             request.app.state.execution_repository,
@@ -108,7 +125,9 @@ def fail_execution(
     execution_id: str,
     payload: FailExecutionRequest,
     request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
 ) -> dict[str, Any]:
+    del principal
     try:
         execution_job = FailExecutionUseCase(
             request.app.state.execution_repository,
