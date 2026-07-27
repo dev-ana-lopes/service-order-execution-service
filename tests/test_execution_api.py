@@ -36,6 +36,10 @@ async def test_execution_api_happy_path():
             json={"steps": ["Diagnose brake noise", "Replace brake pads"]},
             headers=headers,
         )
+        by_service_order_response = await client.get(
+            "/executions/by-service-order/os-1",
+            headers=headers,
+        )
         get_response = await client.get(
             f"/executions/{execution_id}",
             headers=headers,
@@ -47,6 +51,8 @@ async def test_execution_api_happy_path():
     assert start_response.json()["status"] == "IN_PROGRESS"
     assert complete_response.status_code == 200
     assert complete_response.json()["status"] == "COMPLETED"
+    assert by_service_order_response.status_code == 200
+    assert by_service_order_response.json()["execution_id"] == execution_id
     assert get_response.status_code == 200
     assert len(get_response.json()["steps"]) == 2
 
@@ -93,7 +99,6 @@ def _settings() -> Settings:
         APP_NAME="service-order-execution-service",
         APP_VERSION="0.1.0",
         ENVIRONMENT="test",
-        DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/db",
         JWT_SECRET="test-secret-value-with-32-characters",
         CUSTOMER_JWT_SECRET="customer-secret-value-with-32-characters",
         CUSTOMER_JWT_ISSUER="service-order-auth-lambda/test",

@@ -1,4 +1,4 @@
-.PHONY: help install dev-install lint format test test-cov test-integration run run-dev compose-up compose-down compose-logs compose-mongo-shell compose-prod-up compose-prod-down compose-smoke test-mailhog-e2e clean build-docker docker-run check
+.PHONY: help install dev-install lint format test test-cov run run-dev compose-up compose-down compose-logs compose-mongo-shell compose-prod-up compose-prod-down compose-smoke clean build-docker docker-run check
 
 help:
 	@echo "Service Order Management API - Make Commands"
@@ -13,7 +13,6 @@ help:
 	@echo "  make lint             Run lint suite"
 	@echo "  make test             Run pytest"
 	@echo "  make test-cov         Run pytest with coverage"
-	@echo "  make test-integration Run integration tests against real dependencies"
 	@echo ""
 	@echo "Running:"
 	@echo "  make run              Run API server"
@@ -21,7 +20,6 @@ help:
 	@echo "  make compose-up       Start local Docker stack"
 	@echo "  make compose-mongo-shell Open a Mongo shell in the local Docker stack"
 	@echo "  make compose-smoke    Run a quick local smoke test"
-	@echo "  make test-mailhog-e2e Run MailHog-focused integration tests"
 
 install:
 	uv sync
@@ -43,9 +41,6 @@ test:
 
 test-cov:
 	uv run pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html
-
-test-integration:
-	INTEGRATION_TESTS_ENABLED=true uv run pytest -q -m integration
 
 run:
 	uv run uvicorn src.main:app --host 0.0.0.0 --port 8003
@@ -75,9 +70,6 @@ compose-prod-up:
 
 compose-prod-down:
 	docker compose --env-file .env.prod -f docker-compose.prod.yml down
-
-test-mailhog-e2e:
-	uv run pytest -q -m mailhog
 
 clean:
 	rm -rf .pytest_cache .coverage coverage.xml htmlcov build dist

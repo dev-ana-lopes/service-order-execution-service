@@ -21,6 +21,7 @@ Business rules stay in `domain` and `application`; MongoDB, RabbitMQ, and HTTP d
 | --- | --- | --- |
 | `POST` | `/executions` | Enqueue execution and publish `EXECUTION_QUEUED`. |
 | `GET` | `/executions/{execution_id}` | Read an execution job. |
+| `GET` | `/executions/by-service-order/{service_order_id}` | Read the execution job created for a service order. |
 | `POST` | `/executions/{execution_id}/start` | Start execution and publish `EXECUTION_STARTED`. |
 | `POST` | `/executions/{execution_id}/complete` | Add steps, complete execution, and publish `EXECUTION_COMPLETED`. |
 | `POST` | `/executions/{execution_id}/fail` | Fail execution and publish `EXECUTION_FAILED`. |
@@ -50,8 +51,6 @@ The event envelope is JSON with `event_id`, `event_type`, `correlation_id`, `occ
 
 - `memory`: uses in-memory repository and publisher for local tests and fast demos.
 - `real`: uses MongoDB repository and RabbitMQ publisher.
-
-`DATABASE_URL` is tolerated only for backward compatibility with shared environments. This service no longer uses or requires it.
 
 ## NoSQL Ownership
 
@@ -108,7 +107,7 @@ make run-dev
 
 The local API defaults to `http://localhost:8003` and Swagger to `http://localhost:8003/docs`.
 
-`make compose-up` starts MongoDB and RabbitMQ alongside the API and worker, and defaults the Docker stack to `APP_RUNTIME_MODE=real` so execution jobs persist in MongoDB locally. Plain `make run-dev` still uses the `.env` value, which is `memory` by default.
+`make compose-up` starts MongoDB alongside the API and worker, and reuses the shared RabbitMQ broker already exposed at `http://localhost:15672/`. The Docker stack defaults to `APP_RUNTIME_MODE=real` so execution jobs persist in MongoDB locally. Plain `make run-dev` still uses the `.env` value, which is `memory` by default.
 
 ## Validation Evidence
 

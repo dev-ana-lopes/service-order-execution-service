@@ -1,95 +1,26 @@
-﻿# Deployment Runbooks
+# Deployment Runbook
 
-Kubernetes is the primary production/demo deployment path for this repository.
-Docker Compose is preserved only as a legacy fallback.
+Kubernetes is the primary deployment path. Docker Compose is available for local validation.
 
-## Primary Deployment: Kubernetes
+## Runtime
 
-Status: active and automated through GitHub Actions.
+- API and worker run in the `service-order` namespace.
+- Execution persistence is MongoDB through `MONGODB_URL`.
+- RabbitMQ is configured through `RABBITMQ_URL` and the queue/exchange variables.
+- MongoDB is the sole persistence store for this service.
 
-Target:
+## CI/CD
 
-- k3s on EC2
-- PostgreSQL on RDS
-- image published to GHCR
-- API exposed by API Gateway HTTP API:
-  `https://oubv5hamu5.execute-api.us-east-1.amazonaws.com`
+The workflow validates lint, tests, coverage and rendered manifests, then builds and publishes the image to GHCR. Deploy applies the namespace, ConfigMap, Secret, API Deployment, worker Deployment, Service, HPA and optional Ingress.
 
-The Kubernetes deployment is:
+Required production secrets include `APP_ENV`, `EC2_SSH_KEY`, `EC2_HOST`, `EC2_USER` and `EC2_PORT`. `APP_ENV` must contain `MONGODB_URL`, RabbitMQ settings and application secrets.
 
-- automated by `.github/workflows/ci-cd.yml`;
-- rendered with an explicit GHCR image tag;
-- applied remotely on the EC2 k3s host via SSH;
-- deployed through namespace, ConfigMap, Secret, migration Job, Deployment,
-  Service, Ingress and HPA manifests;
-- validated by migration job, rollout status and public smoke test;
-- observed with Datadog Agent logs, Kubernetes/container visibility, dashboard
-  evidence and Synthetic Monitoring.
-
-For the detailed runbook, see `docs/runbooks/k3s-github-actions-deploy.md`.
-
-## CI/CD Requirements
-
-GitHub Environment `production` must provide:
-
-- Secret `APP_ENV`
-- Secret `EC2_SSH_KEY`
-- Variable `EC2_HOST`
-- Variable `EC2_USER`
-- Variable `EC2_PORT`
-
-`APP_ENV` must keep tracing disabled for the current delivery:
-
-```dotenv
-OTEL_ENABLED=false
-DD_TRACE_ENABLED=false
-OTEL_EXPORTER_OTLP_ENDPOINT=
-DD_SERVICE=service-order-execution-service
-DD_ENV=production
-DD_VERSION=3.0.0
-```
-
-The workflow in this repository does not package, deploy or validate Terraform
-for the CPF authentication Lambda. That belongs to `service-order-auth-lambda`.
-
-## Observability
-
-Datadog is the official observability tool for Phase 3. The Datadog Agent is
-installed via Helm in the `datadog` namespace and collects Kubernetes container
-logs. The API emits JSON logs with `correlation_id`, `request_id`, request
-metadata, service, env and version.
-
-Prometheus/Grafana is not the active delivery stack. `/metrics` remains
-available as a technical endpoint of the API.
-
-## HPA
-
-The API HPA must remain:
-
-- `minReplicas: 2`
-- `maxReplicas: 5`
-- CPU `averageUtilization: 70`
-
-## Fallback: Legacy Docker Compose Deployment
-
-Status: deprecated and preserved for emergency use only.
-
-Use this path only for emergency recovery or local operational comparison.
+## Local validation
 
 ```bash
-cp .env.prod.example .env.prod
-python3 scripts/deploy/prepare_env.py .env.prod
-API_IMAGE=service-order-execution-service:prod ./scripts/deploy/release.sh
+uv sync --dev
+make lint
+make test
+make compose-up
+make compose-smoke
 ```
-
-Validate:
-
-```bash
-curl http://<host>:8000/health
-curl http://<host>:8000/health/ready
-curl http://<host>:8000/docs
-```
-
-The legacy Compose flow uses the same application schema and environment
-validation, but it is not the main Phase 3 demonstration path.
-

@@ -6,8 +6,8 @@ Escopo: toda a árvore do projeto.
 ## 1) Visão geral do projeto
 
 - Projeto: API monolítica em FastAPI para gestão de ordens de serviço de oficina mecânica.
-- Stack principal: Python 3.12, FastAPI, SQLAlchemy, PostgreSQL, Alembic, Docker/Compose.
-- Plataforma de demo principal: `k3s` em EC2 + PostgreSQL em RDS + GHCR.
+- Stack principal: Python 3.12, FastAPI, MongoDB, RabbitMQ, Docker/Compose.
+- Plataforma de demo principal: `k3s` em EC2 + MongoDB + RabbitMQ + GHCR.
 - Fluxo legado preservado: EC2 + Docker Compose (fallback operacional).
 - Objetivo acadêmico: sustentar entregas das Fases 1, 2 e 3 com baixo custo (AWS Academy, ~US$50).
 
@@ -23,7 +23,7 @@ Escopo: toda a árvore do projeto.
 
 - `src/`: aplicação backend.
 - `tests/`: testes unitários, integração e cenários de API.
-- `alembic/`: migrations.
+- `k8s/`: manifests de deploy da API, worker e dependências de runtime.
 - `k8s/`: manifests base (com placeholder de imagem para render).
 - `scripts/deploy/`: validação de `.env`, render de manifests, release legado.
 - `infra/`: Terraform.
@@ -43,8 +43,7 @@ Escopo: toda a árvore do projeto.
 - Lint/format check: `make lint`
 - Testes rápidos: `make test`
 - Cobertura: `make test-cov`
-- Integração com PostgreSQL real: `make test-integration`
-- Migrações locais: `make migrate`
+- Persistência local: MongoDB via `make compose-up`
 
 ## 6) Docker e Compose
 
@@ -59,7 +58,7 @@ Escopo: toda a árvore do projeto.
 - Sempre renderizar manifests com imagem explícita antes de aplicar:
 - `python3 scripts/deploy/prepare_env.py <env-file>`
 - `python3 scripts/deploy/render_k8s_manifests.py --env-file <env-file> --output-dir <dir> --image <ghcr-image> [--namespace <ns>]`
-- Nunca aplicar `k8s/deployment.yaml` ou `k8s/job-migrate.yaml` com placeholder (`__API_IMAGE__` ou `${API_IMAGE}`).
+- Nunca aplicar `k8s/deployment.yaml` ou `k8s/deployment-worker.yaml` com placeholder (`__API_IMAGE__` ou `${API_IMAGE}`).
 - Nunca depender de imagem local no cluster.
 - A imagem de deploy deve ser GHCR no padrão `ghcr.io/<owner>/service-order-execution-service:<tag>`.
 
@@ -90,12 +89,11 @@ Escopo: toda a árvore do projeto.
 - Implementações concretas de contratos ficam em `infrastructure`.
 - Alterações de entidades/enums devem considerar impacto em use cases, serializers e testes.
 
-## 12) Regras para Alembic
+## 12) Persistência MongoDB
 
-- Toda mudança persistente de schema deve ter migration.
-- Migration deve ser pequena, reversível e coerente com estado anterior.
-- Validar `upgrade head` localmente com `make migrate`.
-- Não misturar refatoração de aplicação com refatoração de schema sem necessidade.
+- Alterações de documentos devem preservar compatibilidade com as coleções existentes.
+- Índices e validações devem ser aplicados pelo bootstrap/documentação operacional quando necessários.
+- Não adicionar dependências SQL ou jobs de migração a este serviço.
 
 ## 13) Variáveis sensíveis e secrets
 
@@ -109,7 +107,7 @@ Escopo: toda a árvore do projeto.
 - Fluxo principal: `.github/workflows/ci-cd.yml`.
 - O job `validate` deve continuar cobrindo lint, testes e validação de render dos manifests.
 - O job `deploy-production` deve manter build/push no GHCR + render + apply no Kubernetes.
-- Mudanças em deploy devem preservar `k3s + EC2 + RDS` como estratégia principal da demo.
+- Mudanças em deploy devem preservar `k3s + EC2 + MongoDB + RabbitMQ` como estratégia principal da demo.
 
 ## 15) Documentação obrigatória
 
@@ -124,7 +122,7 @@ Escopo: toda a árvore do projeto.
 - Sem segredo real em arquivo versionado.
 - `make lint` executado.
 - `make test` executado.
-- Se aplicável, `make test-cov` e/ou `make test-integration` executados.
+- Se aplicável, `make test-cov` executado.
 - Migrações testadas quando houver alteração de schema.
 - Documentação atualizada quando comportamento/processo mudou.
 
@@ -137,7 +135,6 @@ Escopo: toda a árvore do projeto.
 ## 18) Gaps (necessário criar)
 
 - `make compose-smoke` citado no README, mas sem target no `Makefile` atual.
-- `make test-mailhog-e2e` citado no README, mas sem target no `Makefile` atual.
 - API Gateway como componente dedicado não está automatizado neste repositório.
 - Lambda/serverless não está implementado como fluxo operacional no estado atual.
 - Observabilidade avançada (ex.: stack completa de métricas/tracing centralizados) não está fechada como automação de projeto.
@@ -147,5 +144,5 @@ Escopo: toda a árvore do projeto.
 - Antes de editar, ler contexto mínimo dos arquivos impactados.
 - Preferir correção na causa raiz e evitar mudanças fora de escopo.
 - Validar com os comandos disponíveis no projeto.
-- Em dúvida entre caminhos de alto impacto, escolher o mais simples e consistente com `k3s + EC2 + RDS + GHCR`.
+- Em dúvida entre caminhos de alto impacto, escolher o mais simples e consistente com `k3s + EC2 + MongoDB + RabbitMQ + GHCR`.
 

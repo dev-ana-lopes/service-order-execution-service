@@ -8,7 +8,7 @@ from src.main import create_app
 def test_create_app_in_real_mode_does_not_require_database_url():
     app = create_app(_real_settings())
 
-    assert app.state.settings.DATABASE_URL is None
+    assert not hasattr(app.state.settings, "DATABASE_URL")
     assert hasattr(app.state, "readiness_checker")
 
 

@@ -53,7 +53,6 @@ class Settings(BaseSettings):
     )
     CORS_ALLOW_CREDENTIALS: bool = True
     TRUSTED_HOSTS: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
-    DATABASE_URL: str | None = None
     MONGODB_URL: str = "mongodb://localhost:27017/service_order"
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/%2F"
     RABBITMQ_EXCHANGE: str = "service-order.events"

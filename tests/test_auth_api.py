@@ -38,7 +38,6 @@ def _settings() -> Settings:
         APP_NAME="service-order-execution-service",
         APP_VERSION="0.1.0",
         ENVIRONMENT="test",
-        DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/db",
         JWT_SECRET="test-secret-value-with-32-characters",
         CUSTOMER_JWT_SECRET="customer-secret-value-with-32-characters",
         CUSTOMER_JWT_ISSUER="service-order-auth-lambda/test",

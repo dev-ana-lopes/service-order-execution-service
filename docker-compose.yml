@@ -11,7 +11,7 @@ services:
     environment: &app_environment
       APP_RUNTIME_MODE: ${DOCKER_APP_RUNTIME_MODE:-real}
       MONGODB_URL: ${DOCKER_MONGODB_URL:-mongodb://mongo:27017/service_order}
-      RABBITMQ_URL: ${DOCKER_RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2F}
+      RABBITMQ_URL: ${DOCKER_RABBITMQ_URL:-amqp://guest:guest@host.docker.internal:5672/%2F}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       APP_NAME: ${APP_NAME:-service-order-execution-service}
       APP_VERSION: ${APP_VERSION:-2.1.0}
@@ -45,12 +45,12 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
       mailhog:
         condition: service_healthy
     networks:
       - service-order-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
     healthcheck:
@@ -78,12 +78,12 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
       mailhog:
         condition: service_healthy
     networks:
       - service-order-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
 
@@ -103,23 +103,6 @@ services:
       retries: 5
       start_period: 10s
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: service-order-execution-rabbitmq
-    ports:
-      - "${RABBITMQ_HOST_PORT:-5674}:5672"
-      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-15674}:15672"
-    networks:
-      - service-order-network
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
   mailhog:
     image: mailhog/mailhog:v1.0.1
     container_name: service-order-execution-mailhog
@@ -137,7 +120,6 @@ services:
 
 volumes:
   mongo_data:
-  rabbitmq_data:
 
 networks:
   service-order-network:

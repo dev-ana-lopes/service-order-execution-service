@@ -73,6 +73,24 @@ def get_execution(
     return execution_to_response(execution_job)
 
 
+@router.get("/by-service-order/{service_order_id}")
+def get_execution_by_service_order(
+    service_order_id: str,
+    request: Request,
+    principal: AuthenticatedPrincipal = Depends(require_admin_principal),
+) -> dict[str, Any]:
+    del principal
+    try:
+        execution_job = request.app.state.execution_repository.get_by_service_order_id(
+            service_order_id
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return execution_to_response(execution_job)
+
+
 @router.post("/{execution_id}/start")
 def start_execution(
     execution_id: str,
