@@ -8,6 +8,8 @@ This service owns execution jobs and execution status. It stores execution-orien
 
 ## Architecture
 
+The complete Phase 4 architecture, Saga strategy, service boundaries, databases, communication and technology rationale is documented in [docs/architecture/fase4-final.md](docs/architecture/fase4-final.md).
+
 - `src/domain`: execution job entity, status transitions, steps, document representation, and domain events.
 - `src/application`: use cases and ports for repositories and event publishers.
 - `src/infrastructure`: settings, logging, in-memory and MongoDB repositories, observability, and messaging adapters.
